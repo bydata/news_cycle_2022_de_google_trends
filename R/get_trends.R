@@ -11,15 +11,14 @@ library(gtrendsR)
 
 # Source: https://trends.google.com/trends/yis/2021/DE/
 keywords <- c(
-  "EM 2021", "Bundestagswahl", "Olympische Spiele", "WhatsApp", 
-  "Zapfenstreich", "Farbfilm", "Gamestop", "Capitol",
+  "EM 2021", "Bundestagswahl", "Olympische Spiele", "Zapfenstreich", "Gamestop", 
+  "Capitol",
   "Corona", "Afghanistan", "Hochwasser", "Bahnstreik", "Ever Given", "La Palma",
-  "Christian Eriksen", "Armin Laschet", "Olaf Scholz", 
-  "Annalena Baerbock", "Prinz Philip", "Gerd Müller", "Bärbel Bas", "Wetten dass",
-  "Squid Game", "PCR-Test", "Clubhouse", "3G", "2G", "2G+", 
+  "Armin Laschet", "Olaf Scholz", "Annalena Baerbock", "Prinz Philip", "Gerd Müller", 
+  "Bärbel Bas", "Squid Game", "Clubhouse", "3G", "2G", 
   "Schnelltest", "Impftermin", "Impfung", "Astra Zeneca", "Biontech", "Moderna", 
-  "Curevac", "Lockdown", 
-  "Delta", "Omikron",  "Karl Lauterbach", "Felix Zwayer", "Markus Söder"
+  "Lockdown", "Booster", "Delta", "Omikron",  "Karl Lauterbach", "Felix Zwayer",
+  "log4j"
 )
 
 
