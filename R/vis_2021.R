@@ -6,20 +6,22 @@ library(ggtext)
 trends_combined <- read_rds(file.path("data", "trends_2021_combined.rds"))
 
 # keywords
-keywords <- count(trends_combined, keyword) %>% pull(keyword)
+keywords <- unique(trends_combined$keyword)
 # exclude some keywords manually
 keywords <- keywords[!keywords %in% c("WhatsApp", "Biontech", "Curevac", "2G+",
                                       "Markus Söder", "PCR-Test", "Farbfilm",
                                       "Kuba-Syndrom", "Bärbel Bas", "Gil Ofarim",
                                       "Christian Eriksen", "Karl Lauterbach",
-                                      "Wetten Dass", "Alec Baldwin")]
+                                      "Wetten dass", "Alec Baldwin")]
 # sort keywords alphabetically
 keywords <- keywords[order(keywords)]
 
 trends_combined <- trends_combined %>% 
   group_by(keyword) %>% 
   mutate(hits_rescaled_7dmean = zoo::rollmean(hits_rescaled, align = "center", k = 7, fill = NA),
-         hits_rescaled_7dmean = hits_rescaled_7dmean * 100 / max(hits_rescaled_7dmean, na.rm = TRUE)) %>% 
+         hits_rescaled_7dmean = hits_rescaled_7dmean * 100 / max(hits_rescaled_7dmean, na.rm = TRUE),
+         hits_rescaled_5dmean = zoo::rollmean(hits_rescaled, align = "center", k = 5, fill = NA),
+         hits_rescaled_5dmean = hits_rescaled_5dmean * 100 / max(hits_rescaled_5dmean, na.rm = TRUE)) %>% 
   ungroup()
 
 
@@ -35,13 +37,15 @@ keywords_by_peak_date <- trends_combined %>%
   summarize(peak_date = min(date)) %>%
   arrange(desc(peak_date)) %>% 
   mutate(row_color = google_colors_desaturated[(row_number() %% length(google_colors) + 1)],
-         label = glue::glue("<span style='color: {row_color}'>{keyword}</span>")) %>% 
+         # label = glue::glue("<span style='color: {row_color}'>{keyword}</span>")
+         label = glue::glue("{keyword} 
+                            <span style='color: {row_color};font-family:sans-serif;
+                            font-size:12pt'>\u2022</span>")) %>% 
   select(-row_color)
 
 # set a smaller value for a bigger overlap (>100 = no overlap)
 added_height <- 72
-# control level of smoothing
-loess_bw <- 45/366
+
 
 # Annotations
 plot_titles <- list(
@@ -55,7 +59,8 @@ plot_titles <- list(
   #      Aufgrund der Glättung können Begriffe mit sehr kurzfristigen Peaks im Suchinteresse 
   #      einen Höchstwert unter 100 haben.<br>
   #      Daten: **Google Trends** (Websuche Deutschland) | Visualisierung: **Ansgar Wolsing**")
-  caption = glue::glue("Tägliches Suchaufkommen skaliert auf einen Wertbereich von 
+  caption = glue::glue("Rollierender Mittelwert (7 Tage, zentriert) des 
+  täglichen Suchaufkommens skaliert auf einen Wertbereich von 
   0 bis 100 (maximales Suchinteresse je Suchbegriff).
   <br>
   Daten: **Google Trends** (Websuche Deutschland) | Visualisierung: **Ansgar Wolsing**"))
@@ -80,14 +85,13 @@ Sys.setlocale(category = "LC_ALL", locale = "de_DE.UTF-8")
 
 g <- df_plot %>% 
   ggplot(aes(date, y, group = keyword)) +
-  # stat_smooth(geom = "line", method = "loess", span = loess_bw, col = "white", alpha = 0.7) +
   geom_line(aes(fill = factor(row %% length(google_colors))), # for colouring the areas later 
             col = "white", size = 0.2) + 
   scale_x_datetime(
     expand = c(0.001, 0), 
     date_breaks = "1 month", date_labels = "%b", position = "top") +
   scale_y_continuous(breaks = seq(added_height, added_height * length(keywords), added_height),
-                     labels = keywords_by_peak_date$keyword, expand = c(0, 0)
+                     labels = keywords_by_peak_date$label, expand = c(0, 0)
                      ) +
   scale_fill_manual(values = google_colors) +
   labs(title = plot_titles$title,
@@ -136,8 +140,13 @@ p2 <- g + geom_ribbon(data = gg_df,
                 alpha = 0.7) +
   scale_fill_identity()
 
-ggsave(file.path("plots", "gtrends_de_2021_dark.png"), device = ragg::agg_png,
-       dpi = 300, width = 5.25, height = 8)
+ggsave(file.path("plots", "gtrends_de_2021_dark-smoothed-7d.png"), device = ragg::agg_png,
+       dpi = 400, width = 5.25, height = 8)
+
+# ggsave(file.path("plots", "gtrends_de_2021_dark.png"), device = ragg::agg_png,
+#        dpi = 400, width = 5.25, height = 8)
+# ggsave(file.path("plots", "gtrends_de_2021_dark-smoothed-5d.png"), device = ragg::agg_png,
+#        dpi = 400, width = 5.25, height = 8)
 
 p2 + theme(
   plot.background = element_rect(color = NA, fill = "white"),
@@ -153,45 +162,45 @@ p2 + theme(
 ggsave(file.path("plots", "gtrends_de_2021_light.png"), 
        dpi = 300, width = 6.5, height = 9.5)
 
-# 
-# ## Use geom_area instead
-# p3 <- df_plot %>% 
-#   ggplot(aes(date, y, group = keyword)) +
-#   geom_ribbon(aes(ymin = added, ymax = y, fill = factor(row %% length(google_colors))), # for colouring the areas later 
-#             col = "white", size = 0.2, alpha = 0.5, show.legend = FALSE) + 
-#   scale_x_datetime(expand = c(0, 0), date_breaks = "1 month", date_labels = "%b", position = "top") +
-#   scale_y_continuous(breaks = seq(added_height, added_height * length(keywords), added_height),
-#                      labels = keywords_by_peak_date$keyword, expand = c(0, 0)) +
-#   scale_fill_manual(values = google_colors) +
-#   labs(title = plot_titles$title,
-#        subtitle = plot_titles$subtitle,
-#        caption = plot_titles$caption,
-#        x = NULL, y = NULL) +
-#   theme_minimal(base_family = "Raleway") +
-#   theme(plot.title = element_markdown(family = "Source Sans Pro SemiBold",
-#                                       margin = margin(t = 6, l = 6, r = 6, b = 10),
-#                                       size = 18,
-#                                       color = "white"),
-#         plot.subtitle = element_textbox_simple(margin = margin(l = 6, b = 12), color = "grey95",
-#                                                lineheight = 1.2),
-#         plot.caption = element_textbox_simple(color = "grey95", size = 8, hjust = 0,
-#                                               margin = margin(t = 16, b = 6),
-#                                               lineheight = 1.1),
-#         plot.title.position = "plot",
-#         plot.margin = margin(t = 4, l = 12, r = 12, b = 4),
-#         axis.text.y = element_markdown(hjust = 1, vjust = 0.5, color = "grey95",
-#                                    margin = margin(l = 6, r = 4)),
-#         axis.text.x = element_text(hjust = 0, color = "grey95"),
-#         plot.background = element_rect(color = NA, fill = "grey8"),
-#         panel.grid.major = element_line(size = 0.1, color = "grey40"),
-#         panel.grid.minor = element_blank())
-# 
-# ggsave(file.path("plots", "gtrends_de_2021_dark-2.png"), type = "cairo", 
-#        dpi = 300, width = 5, height = 5 * 10/6)
+
+## Use geom_area instead
+p3 <- df_plot %>%
+  ggplot(aes(date, y, group = keyword)) +
+  geom_ribbon(aes(ymin = added, ymax = y, fill = factor(row %% length(google_colors))), # for colouring the areas later
+            col = "white", size = 0.2, alpha = 0.5, show.legend = FALSE) +
+  scale_x_datetime(expand = c(0, 0), date_breaks = "1 month", date_labels = "%b", position = "top") +
+  scale_y_continuous(breaks = seq(added_height, added_height * length(keywords), added_height),
+                     labels = keywords_by_peak_date$keyword, expand = c(0, 0)) +
+  scale_fill_manual(values = google_colors) +
+  labs(title = plot_titles$title,
+       subtitle = plot_titles$subtitle,
+       caption = plot_titles$caption,
+       x = NULL, y = NULL) +
+  theme_minimal(base_family = "Raleway") +
+  theme(plot.title = element_markdown(family = "Source Sans Pro SemiBold",
+                                      margin = margin(t = 6, l = 6, r = 6, b = 10),
+                                      size = 18,
+                                      color = "white"),
+        plot.subtitle = element_textbox_simple(margin = margin(l = 6, b = 12), color = "grey95",
+                                               lineheight = 1.2),
+        plot.caption = element_textbox_simple(color = "grey95", size = 8, hjust = 0,
+                                              margin = margin(t = 16, b = 6),
+                                              lineheight = 1.1),
+        plot.title.position = "plot",
+        plot.margin = margin(t = 4, l = 12, r = 12, b = 4),
+        axis.text.y = element_markdown(hjust = 1, vjust = 0.5, color = "grey95",
+                                   margin = margin(l = 6, r = 4)),
+        axis.text.x = element_text(hjust = 0, color = "grey95"),
+        plot.background = element_rect(color = NA, fill = "grey8"),
+        panel.grid.major = element_line(size = 0.1, color = "grey40"),
+        panel.grid.minor = element_blank())
+
+ggsave(file.path("plots", "gtrends_de_2021_dark-2.png"), type = "cairo",
+       dpi = 300, width = 5, height = 5 * 10/6)
 
 
 
 
 library(gganimate)
 
-p2 + transition_reveal(date)
+p3 + transition_reveal(date)
