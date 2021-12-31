@@ -85,9 +85,10 @@ plot_titles <- list(
 g <- df_plot %>% 
   ggplot(aes(date, y, group = keyword)) +
   geom_line(aes(fill = factor(row %% length(google_colors))), # for colouring the areas later 
-            col = "white", size = 0.2) + 
+            col = "white", 
+            size = 0.2) + 
   scale_x_datetime(
-    expand = c(0.001, 0), 
+    expand = c(0.0005, 0), 
     date_breaks = "1 month", date_labels = "%b", position = "top") +
   scale_y_continuous(breaks = seq(added_height, added_height * length(keywords), added_height),
                      labels = keywords_by_peak_date$label, expand = c(0, 0)
@@ -148,23 +149,42 @@ ggsave(file.path("plots", "gtrends_de_2021_dark-smoothed-7d.png"), device = ragg
 #        dpi = 400, width = 5.25, height = 8)
 
 
+
+# library(patchwork)
+
+p2 + labs(title = NULL, subtitle = "", 
+          tag = glue("GOOGLE TRENDS <span style='color:{google_colors[1]}'>2021</span>")
+          ) +
+  theme(
+    plot.tag = element_markdown(
+      family = "Roboto Condensed", face = "bold",
+      margin = margin(t = 6, l = 20, r = 0, b = 8),
+      size = 36, color = "white",
+      angle = 270, hjust = 0),
+    plot.margin = margin(r = 60),
+    plot.tag.position = c(1.05, 0.93))
+
+ggsave(file.path("plots", "gtrends_de_2021_dark-smoothed-7d_title_right.png"), device = ragg::agg_png,
+       dpi = 400, width = 6, height = 7.5)
+
+
 ## Light version (needs polishing) ---------------------------------------------
 
 p2 + theme(
   plot.background = element_rect(color = NA, fill = "white"),
   text = element_text(color = "grey35"),
-  axis.text.x = element_markdown(color = "grey30"),
-  axis.text.y = element_markdown(color = "grey2", family = "Roboto"),
-  # panel.grid.major.x = element_line(color = "grey89"),
+  axis.text.x = element_markdown(color = "grey35"),
+  axis.text.y = element_markdown(color = "grey24", family = "Roboto"),
   panel.grid.major.x = element_blank(),
-  panel.grid.major.y = element_line(color = "grey67"),
-  plot.title = element_markdown(color = "black", family = "Roboto", face = "bold")
+  panel.grid.major.y = element_line(color = "grey70"),
+  panel.ontop = TRUE,
+  plot.title = element_markdown(color = "black", family = "Roboto", face = "bold"),
+  plot.caption = element_textbox_simple(color = "grey45",
+                                        margin = margin(t = 16, b = 6))
 )
 
-ggsave(file.path("plots", "gtrends_de_2021_light.png"), 
-       dpi = 300, width = 6.5, height = 9.5)
-
-
+ggsave(file.path("plots", "gtrends_de_2021_light-smoothed-7d.png"), device = ragg::agg_png,
+       dpi = 400, width = 6, height = 7.5)
 
 ## Animation (needs polishing) ---------------------------------------------
 
