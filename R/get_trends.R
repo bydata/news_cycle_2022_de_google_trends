@@ -9,16 +9,21 @@ library(gtrendsR)
 # https://medium.com/@bewerunge.franz/google-trends-how-to-acquire-daily-data-for-broad-time-frames-b6c6dfe200e6
 
 
-# Source: https://trends.google.com/trends/yis/2021/DE/
+# Source: https://trends.google.com/trends/yis/2022/DE/
 keywords <- c(
-  "EM 2021", "Bundestagswahl", "Olympische Spiele", "Zapfenstreich", "Gamestop", 
-  "Capitol",
-  "Corona", "Afghanistan", "Hochwasser", "Bahnstreik", "Ever Given", "La Palma",
-  "Armin Laschet", "Olaf Scholz", "Annalena Baerbock", "Prinz Philip", "Gerd Müller", 
-  "Bärbel Bas", "Squid Game", "Clubhouse", "3G", "2G", 
-  "Schnelltest", "Impftermin", "Impfung", "Astra Zeneca", "Biontech", "Moderna", 
-  "Lockdown", "Booster", "Delta", "Omikron",  "Karl Lauterbach", "Felix Zwayer",
-  "log4j"
+  "Ukraine", "WM 2022", "Olympia 2022", "Queen", "Putin",
+  "Affenpocken", "Frauen EM 2022", "Nations League", "Jeffrey Dahmer",
+  "Sturmböen", 
+  "9-Euro-Ticket", "Hitzewarnung", "Layla", "Will Smith", "Taiwan",
+  "Energiepauschale", "Katar", "Bürgergeld",
+  "Uwe Seeler", "Meat Loaf", "Anne Heche", "Aaron Carter",
+  # "Olivia Newton John", "Taylor Hawkins", "Fynn Kliemann",
+  "Johnny Depp", "Amber Heard", "Boris Becker", "Novak Djokovic",
+  "Anne Spiegel", "Gerhard Schröder", "Sanna Marin", "Selenski",
+  "Stranger Things", "House of the Dragon", "Euphoria", "The Watcher",
+  "Don't Look Up", "Uncharted", "Top Gun" #,
+  # added
+  # "Inflation"
 )
 
 
@@ -28,41 +33,38 @@ replace_lessthan1 <- function(x, num_value = 0.5) {
 }
 
 
-# get trends for 2021 (returns monthly data)
-time <- paste("2016-01-01", Sys.Date())
+# get trends for 2022 (returns monthly data)
+time <- paste("2017-01-01", (Sys.Date() - period("1 day")))
 trends_year_raw <- map(keywords, gtrends, geo = "DE", 
                        time = time, gprop = "web", 
                        onlyInterest = TRUE)
 write_rds(trends_year_raw, file.path("data", "trends_year_raw.rds"))
-trends_year_2021 <- flatten(trends_year_raw) %>% 
+trends_year_2022 <- flatten(trends_year_raw) %>% 
   set_names(keywords) %>% 
-  map(~filter(.x, date >= as_date("2021-01-01")))
-write_rds(trends_year_2021, file.path("data", "trends_year.rds"))
+  map(~filter(.x, date >= as_date("2022-01-01")))
+write_rds(trends_year_2022, file.path("data", "trends_year.rds"))
 
-trends_year_2021_df <- map(trends_year_2021, mutate_at, "hits", as.character) %>% 
+trends_year_2022_df <- map(trends_year_2022, mutate_at, "hits", as.character) %>% 
   bind_rows() %>% 
   mutate(month = date,
          hits = replace_lessthan1(hits))
 
 # Check if the search interest is below 100 for one of the keywords
-trends_year_2021_df %>% 
+trends_year_2022_df %>% 
   mutate(hits = as.numeric(hits), 
          hits = replace_na(hits, 0)) %>% 
   group_by(keyword) %>% 
   summarize(min(hits), max(hits)) %>% View()
 
 # Rescale monthly search interest to 100 max
-trends_year_2021_df <- trends_year_2021_df %>% 
+trends_year_2022_df <- trends_year_2022_df %>% 
   group_by(keyword) %>% 
   mutate(hits = hits * 100 / max(hits)) %>% 
   ungroup()
 
 
-
-
-
 # create monthly intervals
-start_date <- as_date("2021-01-01")
+start_date <- as_date("2022-01-01")
 max_elems <- 12
 range <- vector("list", max_elems)
 for (month in seq(max_elems)) {
@@ -71,7 +73,7 @@ for (month in seq(max_elems)) {
   
   # API will return an error if end date is in the future
   if (end_date >= today()) {
-    end_date <- today()
+    end_date <- today() - period("1 day")
     range[[month]] <- paste(start_date, end_date)
     break
   }
@@ -86,7 +88,7 @@ range
 
 # retrieve monthly data for all keywords
 gtrends_sleep <- function(keyword, time, sleep = 1, geo = "DE", gprop = "web", 
-                          onlyInterest = TRUE #, tz = -120
+                          onlyInterest = TRUE # , tz = -120
                           ) {
   Sys.sleep(sleep)
   trends <- gtrends(keyword, geo = geo, time = time, gprop = gprop, 
@@ -98,12 +100,14 @@ gtrends_sleep <- function(keyword, time, sleep = 1, geo = "DE", gprop = "web",
 }
 
 gtrends_sleep_safely <- safely(gtrends_sleep)
+gtrends_sleep_possibly <- possibly(gtrends_sleep, otherwise = NULL)
 
 trends_daily_raw <- map(
   range,
   function(x) {
+    # print(x)
     trends <- map(keywords, 
-                  gtrends_sleep, geo = "DE", time = x, gprop = "web", onlyInterest = TRUE)
+                  gtrends_sleep_possibly, geo = "DE", time = x, gprop = "web", onlyInterest = TRUE)
     trends <- set_names(trends, keywords)
     # Show progress
     cat("|")
@@ -131,7 +135,7 @@ write_rds(trends_daily, file.path("data", "trends_daily.rds"))
 trends_combined <- bind_rows(trends_daily) %>% 
   mutate(date = as_date(date),
          month = floor_date(date, "month")) %>% 
-  inner_join(trends_year_2021_df, by = c("keyword", "month"), suffix = c(".d", ".m")) %>% 
+  inner_join(trends_year_2022_df, by = c("keyword", "month"), suffix = c(".d", ".m")) %>% 
   # if hits is "<1", replace it with a numeric value between >0 and <1
   mutate_at(vars(starts_with("hits.")), ~replace_lessthan1(., 0.5)) %>% 
   # if monthly hits value is 0, increase it slightly to 0.1 so that daily variations persist
@@ -143,7 +147,7 @@ trends_combined <- bind_rows(trends_daily) %>%
 
 # visualize the values generated by multiplying daily and monthly rates vs. monthly rates only
 trends_combined %>% 
-  filter(keyword == "Corona") %>% 
+  filter(keyword == "Ukraine") %>% 
   select(-month, -geo, -gprop, -keyword, -hits.d) %>% 
   pivot_longer(cols = -date, names_to = "type", values_to = "value") %>% 
   ggplot(aes(date, value, col = type)) +
@@ -172,5 +176,5 @@ trends_combined <- trends_combined %>%
   mutate(hits_rescaled = hits * 100 / max(hits)) %>% 
   ungroup()
 
-write_rds(trends_combined, "data/trends_2021_combined.rds")
+write_rds(trends_combined, "data/trends_2022_combined.rds")
 
