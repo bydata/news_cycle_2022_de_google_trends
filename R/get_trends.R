@@ -11,19 +11,19 @@ library(gtrendsR)
 
 # Source: https://trends.google.com/trends/yis/2022/DE/
 keywords <- c(
-  "Ukraine", "WM 2022", "Olympia 2022", "Queen", "Putin",
+  "Ukraine", "WM 2022", "Olympia 2022", "Queen", "Wladimir Putin",
   "Affenpocken", "Frauen EM 2022", "Nations League", "Jeffrey Dahmer",
   "Sturmböen", 
   "9-Euro-Ticket", "Hitzewarnung", "Layla", "Will Smith", "Taiwan",
   "Energiepauschale", "Katar", "Bürgergeld",
   "Uwe Seeler", "Meat Loaf", "Anne Heche", "Aaron Carter",
-  # "Olivia Newton John", "Taylor Hawkins", "Fynn Kliemann",
+  "Olivia Newton John", "Taylor Hawkins", "Fynn Kliemann",
   "Johnny Depp", "Amber Heard", "Boris Becker", "Novak Djokovic",
-  "Anne Spiegel", "Gerhard Schröder", "Sanna Marin", "Selenski",
+  "Anne Spiegel", "Gerhard Schröder", "Sanna Marin", "Wolodymyr Selenski",
   "Stranger Things", "House of the Dragon", "Euphoria", "The Watcher",
-  "Don't Look Up", "Uncharted", "Top Gun" #,
+  "Don't Look Up", "Uncharted", "Top Gun",
   # added
-  # "Inflation"
+  "Inflation"
 )
 
 

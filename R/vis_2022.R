@@ -18,7 +18,18 @@ trends_combined <- read_rds(file.path("data", "trends_2022_combined.rds"))
 # keywords
 keywords <- unique(trends_combined$keyword)
 # exclude some keywords manually
-keywords <- keywords[!keywords %in% c()]
+keywords <- keywords[!keywords %in% c(
+  "Aaron Carter", "Uncharted", "Taiwan", "Anne Heche", "The Watcher", "Top Gun", "Inflation"
+)]
+keywords_top5 <- c(
+  "Ukraine", "WM 2022", "Olympia 2022", "Queen", "Wladimir Putin",
+  "Affenpocken", "9-Euro-Ticket", "Hitzewarnung", "Layla", 
+  "Uwe Seeler", "Meat Loaf", "Anne Heche", "Aaron Carter",
+  "Johnny Depp", "Amber Heard", "Boris Becker", "Novak Djokovic",
+  "Anne Spiegel", "Gerhard Schröder", "Sanna Marin", "Wolodymyr Selenski"
+)
+keywords <- keywords_top5
+
 # sort keywords alphabetically
 keywords <- keywords[order(keywords)]
 
@@ -42,14 +53,16 @@ keywords_by_peak_date <- trends_combined %>%
     row_color = google_colors_desaturated[(row_number() %% length(google_colors) + 1)],
     # add a colored dot as a guidance in the y-axis labels
     label = glue::glue(
-      "{keyword}
-      <span style='color: {row_color};font-family:Arial;'>\u2022</span>")
+      # "{keyword}
+      # <span style='color: {row_color};font-family:Arial;'>\u2022</span>"
+      "<span style='color: {row_color}'>{keyword}</span>"
+      )
   ) %>%
   select(-row_color)
 
 # Define the overlap of ridgelines 
 # Choose a smaller value for a bigger overlap (>100 = no overlap)
-added_height <- 72
+added_height <- 75
 
 # Prepare data for plot
 df_plot <- trends_combined %>% 
@@ -70,11 +83,11 @@ df_plot <- trends_combined %>%
 # Annotations
 plot_titles <- list(
   title = glue("Google Trends <span style='color:{google_colors[1]}'>2022</span>"),
-  subtitle = "Tägliches relatives Suchaufkommen ausgewählter Suchbegriffe Deutschland",
+  subtitle = "Tägliches relatives Suchaufkommen der Top-5-Suchbegriffe in verschiedenen
+  Kategorien in Deutschland",
   caption = glue::glue("Rollierender Mittelwert (7 Tage, zentriert) des 
   täglichen Suchaufkommens skaliert auf einen Wertbereich von 
   0 bis 100 (maximales Suchinteresse je Suchbegriff).
-  <br>
   Daten: **Google Trends** (Websuche Deutschland) | Visualisierung: **Ansgar Wolsing**"))
 
 g <- df_plot %>% 
@@ -99,14 +112,15 @@ g <- df_plot %>%
     plot.title = element_markdown(family = "Roboto Condensed", face = "bold",
                                   margin = margin(t = 6, l = 6, r = 6, b = 8),
                                   size = 22, color = "white"),
-    plot.subtitle = element_textbox_simple(margin = margin(l = 6, b = 18), 
+    plot.subtitle = element_textbox_simple(margin = margin(l = 6, t = 6, b = 18), 
                                            lineheight = 1.2, size = 10),
     plot.caption = element_textbox_simple(size = 8, hjust = 0,
                                           margin = margin(t = 16, b = 6),
                                           lineheight = 1.25, color = "grey80"),
     plot.title.position = "plot",
+    plot.caption.position = "plot",
     plot.margin = margin(t = 4, l = 16, r = 16, b = 4),
-    axis.text.y = element_markdown(hjust = 1, vjust = 0.5, color = "grey90",
+    axis.text.y = element_markdown(hjust = 1, vjust = 0, color = "grey90",
                                    family = "Roboto Condensed", size = 8,
                                    margin = margin(l = 6, r = 4)),
     axis.text.x = element_text(hjust = 0, color = "grey80"),
@@ -136,7 +150,7 @@ p2 <- g + geom_ribbon(data = gg_df,
   scale_fill_identity()
 
 ggsave(file.path("plots", "gtrends_de_2022_dark-smoothed-7d.png"), device = ragg::agg_png,
-       dpi = 400, width = 5.25, height = 8)
+       dpi = 400, width = 6, height = 8)
 
 
 
@@ -146,7 +160,8 @@ p2 + theme(
   plot.background = element_rect(color = NA, fill = "white"),
   text = element_text(color = "grey35"),
   axis.text.x = element_markdown(color = "grey35"),
-  axis.text.y = element_markdown(color = "grey24", family = "Roboto"),
+  axis.text.y = element_markdown(color = "grey24", family = "Roboto Condensed", 
+                                 size = 9, face = "bold"),
   panel.grid.major.x = element_blank(),
   panel.grid.major.y = element_line(color = "grey70"),
   panel.ontop = TRUE,
@@ -156,5 +171,4 @@ p2 + theme(
 )
 
 ggsave(file.path("plots", "gtrends_de_2022_light-smoothed-7d.png"), device = ragg::agg_png,
-       dpi = 400, width = 6, height = 7.5)
-
+       dpi = 400, width = 6, height = 7)
