@@ -1,5 +1,0 @@
-load("/Users/ansgar/Documents/Repositories/news_cycle_2021_de_google_trends/data/trends_2021_combined.rds")
-load("/Users/ansgar/Documents/Repositories/news_cycle_2021_de_google_trends/data/trends_daily_raw.rds")
-load("/Users/ansgar/Documents/Repositories/news_cycle_2021_de_google_trends/data/trends_daily.rds")
-load("/Users/ansgar/Documents/Repositories/news_cycle_2021_de_google_trends/data/trends_year_raw.rds")
-load("/Users/ansgar/Documents/Repositories/news_cycle_2021_de_google_trends/data/trends_year.rds")
