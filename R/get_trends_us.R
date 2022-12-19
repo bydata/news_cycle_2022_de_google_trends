@@ -1,0 +1,171 @@
+library(tidyverse)
+library(lubridate)
+# devtools::install_github("PMassicotte/gtrendsR")
+library(gtrendsR)
+
+
+# https://www.axios.com/news-cycle-2020-google-trends-chart-8a27fc67-2dd0-45b6-ae23-2672c2771c50.html
+# https://www.r-bloggers.com/2019/10/vignette-google-trends-with-the-gtrendsr-package/
+# https://medium.com/@bewerunge.franz/google-trends-how-to-acquire-daily-data-for-broad-time-frames-b6c6dfe200e6
+
+
+# Source: https://trends.google.com/trends/yis/2022/US/
+keywords <- c(
+  "Wordle", "Election results", "Betty White", "Queen Elizabeth", "Bob Saget",
+  "Ukraine", "Powerball numbers", "Hurricane Ian",
+  "Johnny Depp", "Will Smith", "Amber Heard", "Antonio Brown", "Kari Lake",
+  "Chris Rock", "Julia Fox", "Serena Williams", "Joe Burrow", "Aaron Judge", "Manti Te'o",
+  "Anne Heche", "Aaron Carter"
+)
+
+
+# Replaces the "<1" value with a numeric value and converts x to a numeric variable
+replace_lessthan1 <- function(x, num_value = 0.5) {
+  ifelse(x == "<1", num_value, as.numeric(x))
+}
+
+
+# get trends for 2022 (returns monthly data)
+time <- paste("2017-01-01", (Sys.Date() - period("1 day")))
+trends_year_raw <- map(keywords, gtrends, geo = "US", 
+                       time = time, gprop = "web", 
+                       onlyInterest = TRUE)
+write_rds(trends_year_raw, file.path("data", "us", "trends_year_raw.rds"))
+trends_year_2022 <- flatten(trends_year_raw) %>% 
+  set_names(keywords) %>% 
+  map(~filter(.x, date >= as_date("2022-01-01")))
+write_rds(trends_year_2022, file.path("data", "us", "trends_year.rds"))
+
+trends_year_2022_df <- map(trends_year_2022, mutate_at, "hits", as.character) %>% 
+  bind_rows() %>% 
+  mutate(month = date,
+         hits = replace_lessthan1(hits))
+
+# Check if the search interest is below 100 for one of the keywords
+trends_year_2022_df %>% 
+  mutate(hits = as.numeric(hits), 
+         hits = replace_na(hits, 0)) %>% 
+  group_by(keyword) %>% 
+  summarize(min(hits), max(hits)) %>% View()
+
+# Rescale monthly search interest to 100 max
+trends_year_2022_df <- trends_year_2022_df %>% 
+  group_by(keyword) %>% 
+  mutate(hits = hits * 100 / max(hits)) %>% 
+  ungroup()
+
+
+# create monthly intervals
+start_date <- as_date("2022-01-01")
+max_elems <- 12
+range <- vector("list", max_elems)
+for (month in seq(max_elems)) {
+  # set end date (last day of month)
+  end_date <- start_date + period("1 month") - 1
+  
+  # API will return an error if end date is in the future
+  if (end_date >= today()) {
+    end_date <- today() - period("1 day")
+    range[[month]] <- paste(start_date, end_date)
+    break
+  }
+  range[[month]] <- paste(start_date, end_date)
+  
+  # set new start date
+  start_date <- end_date + period("1 day")
+}
+range <- as.character(range)
+range
+
+
+# retrieve monthly data for all keywords
+gtrends_sleep <- function(keyword, time, sleep = 1, geo = "DE", gprop = "web", 
+                          onlyInterest = TRUE # , tz = -120
+                          ) {
+  Sys.sleep(sleep)
+  trends <- gtrends(keyword, geo = geo, time = time, gprop = gprop, 
+                    onlyInterest = onlyInterest,# tz = tz
+                    )
+  # ensure "hits" is a character type
+  trends$hits <- as.character(trends$hits) # NOT TESTED
+  return(trends)
+}
+
+gtrends_sleep_safely <- safely(gtrends_sleep)
+gtrends_sleep_possibly <- possibly(gtrends_sleep, otherwise = NULL)
+
+trends_daily_raw <- map(
+  range,
+  function(x) {
+    trends <- map(keywords, 
+                  gtrends_sleep_possibly, geo = "DE", time = x, gprop = "web", onlyInterest = TRUE)
+    trends <- set_names(trends, keywords)
+    # Show progress
+    cat("|")
+    # Wait a sec or 2...
+    Sys.sleep(5)
+    return(trends)
+  }
+)
+
+write_rds(trends_daily_raw, file.path("data", "us", "trends_daily_raw.rds"))
+
+trends_daily <- 
+  transpose(trends_daily_raw) %>%
+  # map(flatten) %>%
+  map(~map(.x, pluck, "interest_over_time")) %>% 
+  # There are empty list elements for some months for some keywords
+  # remove those, otherwise nested map call will fail
+  map(compact) %>%
+  map( ~ map(.x, mutate_at, "hits", as.character) %>%
+         bind_rows())
+write_rds(trends_daily, file.path("data", "us", "trends_daily.rds"))
+
+
+# multiply monthly and daily values to get the "true" daily hits value
+trends_combined <- bind_rows(trends_daily) %>% 
+  mutate(date = as_date(date),
+         month = floor_date(date, "month")) %>% 
+  inner_join(trends_year_2022_df, by = c("keyword", "month"), suffix = c(".d", ".m")) %>% 
+  # if hits is "<1", replace it with a numeric value between >0 and <1
+  mutate_at(vars(starts_with("hits.")), ~replace_lessthan1(., 0.5)) %>% 
+  # if monthly hits value is 0, increase it slightly to 0.1 so that daily variations persist
+  mutate(hits.m = ifelse(hits.m == 0, 0.1, hits.m)) %>% 
+  mutate(hits = hits.d * hits.m / 100) %>% 
+  select(everything(), 
+         -starts_with("time."), -starts_with("time."), -starts_with("category."), -geo.m, -gprop.m, -date.m,
+         geo = geo.d, gprop = gprop.d, date = date.d)
+
+# visualize the values generated by multiplying daily and monthly rates vs. monthly rates only
+trends_combined %>% 
+  filter(keyword == "Ukraine") %>% 
+  select(-month, -geo, -gprop, -keyword, -hits.d) %>% 
+  pivot_longer(cols = -date, names_to = "type", values_to = "value") %>% 
+  ggplot(aes(date, value, col = type)) +
+  geom_line()
+
+
+#' Since monthly trends have been obtained from a longer period, hit scores have to be rescaled to a range of 0 to 100.
+
+# show maximum hit value per keyword
+trends_combined %>% 
+  group_by(keyword) %>% 
+  summarize(max = max(hits)) %>% 
+  arrange(max)
+
+# check calculation (every maximum value must be 100)
+trends_combined %>% 
+  group_by(keyword) %>% 
+  mutate(hits_rescaled = hits * 100 / max(hits)) %>% 
+  ungroup() %>% 
+  group_by(keyword) %>% 
+  summarize(max = max(hits_rescaled)) %>% 
+  arrange(max)
+
+trends_combined <- trends_combined %>% 
+  group_by(keyword) %>% 
+  mutate(hits_rescaled = hits * 100 / max(hits)) %>% 
+  ungroup()
+
+write_rds(trends_combined, file.path("data", "us", "trends_2022_combined.rds"))
+
